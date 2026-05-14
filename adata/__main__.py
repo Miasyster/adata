@@ -100,7 +100,24 @@ def _cmd_fetch(args: argparse.Namespace):
         print(f"Benchmark update: {result}")
         return
 
-    if args.universe:
+    if args.universe == "all":
+        asset_type = {"stocks": "stock", "etf": "etf", "index": "index"}.get(
+            args.category, "stock"
+        )
+        codes = provider.list_instruments(asset_type)
+        if not codes:
+            print(f"No instruments found for {args.category}", file=sys.stderr)
+            sys.exit(1)
+        print(f"All {args.category}: {len(codes)} instruments")
+        result = updater.fetch(
+            codes=codes,
+            start_date=args.start,
+            end_date=args.end,
+            mode=args.mode,
+            category=args.category,
+            batch_size=args.batch_size,
+        )
+    elif args.universe:
         result = updater.fetch_by_universe(
             universe=args.universe,
             start_date=args.start,
