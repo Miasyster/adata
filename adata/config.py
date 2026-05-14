@@ -26,7 +26,6 @@ UNIVERSE_INDEX_MAP = {
     "csi500": "000905.XSHG",
     "zz500": "000905.XSHG",
     "csi1000": "000852.XSHG",
-    "csi2000": None,
 }
 
 
