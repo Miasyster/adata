@@ -13,15 +13,15 @@ echo "=========================================="
 
 SOURCE="rqdatac"
 
-# --- 1. Stocks: all A-shares ---
+# --- 1. Stocks: incremental update all cached ---
 echo ""
-echo "[1/4] Stocks — all A-shares"
-python -m adata fetch --source $SOURCE --universe all --category stocks --mode incremental || echo "WARN: stocks failed"
+echo "[1/4] Stocks — incremental (cached only)"
+python -m adata fetch --source $SOURCE --category stocks --mode incremental || echo "WARN: stocks failed"
 
-# --- 2. ETF: all ---
+# --- 2. ETF: incremental update all cached ---
 echo ""
-echo "[2/4] ETF — all"
-python -m adata fetch --source $SOURCE --universe all --category etf --mode incremental || echo "WARN: ETF failed"
+echo "[2/4] ETF — incremental (cached only)"
+python -m adata fetch --source $SOURCE --category etf --mode incremental || echo "WARN: ETF failed"
 
 # --- 3. Benchmarks ---
 echo ""
