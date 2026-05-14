@@ -89,6 +89,12 @@ def _query(sql: str, params=None) -> pd.DataFrame:
     return pd.read_sql(sql, conn, params=params)
 
 
+def _in_clause(codes: list[str]) -> tuple[str, list[str]]:
+    """Build a parameterized IN clause: returns ('(%s,%s,%s)', [codes])."""
+    placeholders = ",".join(["%s"] * len(codes))
+    return f"({placeholders})", list(codes)
+
+
 def _normalize_stock_df(df: pd.DataFrame) -> pd.DataFrame:
     out = pd.DataFrame()
     out["stock_code"] = df.apply(
@@ -115,24 +121,27 @@ class PolarDBProvider(BaseProvider):
         codes: list[str],
         start_date: str,
         end_date: str,
+        adjust: str = "qfq",
     ) -> pd.DataFrame:
+        if adjust != "none":
+            logger.warning("PolarDB returns unadjusted prices; adjust='%s' ignored", adjust)
         polardb_codes = [_to_polardb_code(c) for c in codes]
         all_dfs: list[pd.DataFrame] = []
 
         for i in range(0, len(polardb_codes), 500):
             chunk = polardb_codes[i : i + 500]
-            placeholders = ",".join(["%s"] * len(chunk))
+            in_sql, in_params = _in_clause(chunk)
             sql = (
                 f"SELECT code, full_code, trading_day, "
                 f"open_price, high_price, low_price, close_price, "
                 f"turnover_volume, turnover_value, change_pct "
                 f"FROM ads_stock_market_quotations_day "
-                f"WHERE code IN ({placeholders}) "
+                f"WHERE code IN {in_sql} "
                 f"AND market_type IN ('sh','sz') "
                 f"AND trading_day BETWEEN %s AND %s "
                 f"ORDER BY trading_day"
             )
-            params = chunk + [start_date, end_date]
+            params = in_params + [start_date, end_date]
             try:
                 df = _query(sql, params)
                 if df is not None and len(df) > 0:

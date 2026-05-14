@@ -221,8 +221,8 @@ class TestValidation:
         sparse_provider = FakeProvider()
         sparse_provider.name = "sparse"
         original_fetch = sparse_provider.fetch_daily
-        def sparse_fetch(codes, start, end):
-            df = original_fetch(codes, start, end)
+        def sparse_fetch(codes, start, end, adjust="qfq"):
+            df = original_fetch(codes, start, end, adjust=adjust)
             if len(df) > 0:
                 return df.drop(columns=["pct_change"])
             return df

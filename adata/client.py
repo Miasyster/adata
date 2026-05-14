@@ -11,7 +11,7 @@ from datetime import date
 
 import pandas as pd
 
-from .config import get_data_dir
+from .config import approx_trading_days, get_data_dir
 from .providers import get_provider, list_providers
 from .providers.base import BaseProvider
 from .schema import DAILY_COLUMNS, CodeNormalizer
@@ -43,6 +43,7 @@ class DataClient:
         start_date: str,
         end_date: str | None = None,
         category: str = "stocks",
+        adjust: str = "qfq",
     ) -> pd.DataFrame:
         codes = [CodeNormalizer.normalize(c) for c in codes]
         end_date = end_date or date.today().isoformat()
@@ -51,7 +52,7 @@ class DataClient:
 
         if missing:
             asset_type = _CATEGORY_ASSET_TYPE.get(category, "stock")
-            self._fetch_missing(missing, start_date, end_date, category, asset_type)
+            self._fetch_missing(missing, start_date, end_date, category, asset_type, adjust)
             fresh_dfs = self._read_codes(missing, start_date, end_date, category)
             cached_dfs.extend(fresh_dfs)
 
@@ -144,11 +145,13 @@ class DataClient:
                 continue
 
             last_dt = date.fromisoformat(last)
-            gap = (today_dt - last_dt).days
-            stale = gap > 3
+            gap_calendar = (today_dt - last_dt).days
+            gap_trading = approx_trading_days(last, today_str)
+            stale = gap_trading > 2
             entry = {"code": code, "last_date": last, "cached": True, "stale": stale}
             if stale:
-                entry["gap_days"] = gap
+                entry["gap_days"] = gap_calendar
+                entry["gap_trading_days"] = gap_trading
             results.append(entry)
 
         return results
@@ -165,6 +168,8 @@ class DataClient:
         req_start = pd.Timestamp(start_date)
         req_end = pd.Timestamp(end_date)
 
+        expected = approx_trading_days(start_date, end_date)
+
         for code in codes:
             df = self.store.read(code, category)
             if df is not None and len(df) > 0:
@@ -173,7 +178,7 @@ class DataClient:
                 if lo <= req_start and hi >= req_end:
                     mask = (df["trade_date"] >= req_start) & (df["trade_date"] <= req_end)
                     filtered = df[mask]
-                    if len(filtered) > 0:
+                    if len(filtered) > 0 and len(filtered) >= expected * 0.3:
                         cached_dfs.append(filtered)
                         continue
             missing.append(code)
@@ -187,6 +192,7 @@ class DataClient:
         end_date: str,
         category: str,
         asset_type: str,
+        adjust: str = "qfq",
     ):
         remaining = list(codes)
 
@@ -200,7 +206,7 @@ class DataClient:
                 batch_size = 500 if provider.name == "polardb" else 200
                 for i in range(0, len(remaining), batch_size):
                     chunk = remaining[i : i + batch_size]
-                    df = provider.fetch_daily(chunk, start_date, end_date)
+                    df = provider.fetch_daily(chunk, start_date, end_date, adjust=adjust)
                     if df is not None and len(df) > 0:
                         df = self._validate_daily(df, provider.name)
                         if df is not None and len(df) > 0:

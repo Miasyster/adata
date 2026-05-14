@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+import pandas as pd
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -33,3 +34,18 @@ def get_data_dir() -> Path:
     d = Path(os.environ.get("ADATA_DIR", "") or str(Path.home() / ".adata"))
     d.mkdir(parents=True, exist_ok=True)
     return d
+
+
+def approx_trading_days(start_date: str, end_date: str) -> int:
+    """Approximate A-share trading day count between two dates (inclusive).
+
+    Uses business days minus ~4.3% for Chinese holidays (~11/year out of 252).
+    """
+    import numpy as np
+
+    s = pd.Timestamp(start_date).date()
+    e = pd.Timestamp(end_date).date()
+    if s > e:
+        return 0
+    weekdays = int(np.busday_count(s, e)) + 1
+    return max(1, int(weekdays * 0.957))

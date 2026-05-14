@@ -14,8 +14,12 @@ class BaseProvider(ABC):
     @abstractmethod
     def fetch_daily(
         self, codes: list[str], start_date: str, end_date: str,
+        adjust: str = "qfq",
     ) -> pd.DataFrame:
-        """Fetch daily OHLCV. Returns DataFrame with standard DAILY_COLUMNS."""
+        """Fetch daily OHLCV. Returns DataFrame with standard DAILY_COLUMNS.
+
+        adjust: 'qfq' (forward-adjusted, default), 'hfq' (backward), 'none'.
+        """
 
     @abstractmethod
     def fetch_benchmark(

@@ -86,21 +86,25 @@ class RqdatacProvider(BaseProvider):
     name = "rqdatac"
     supported_asset_types = {"stock", "etf", "index"}
 
+    _ADJUST_MAP = {"qfq": "pre", "hfq": "post", "none": "none"}
+
     def fetch_daily(
         self,
         codes: list[str],
         start_date: str,
         end_date: str,
+        adjust: str = "qfq",
     ) -> pd.DataFrame:
         _ensure_init()
         rq_codes = [CodeNormalizer.to_rqdatac(c) for c in codes]
+        rq_adjust = self._ADJUST_MAP.get(adjust, "pre")
 
         rq_df = rqdatac.get_price(
             rq_codes,
             start_date=start_date,
             end_date=end_date,
             frequency="1d",
-            adjust_type="pre",
+            adjust_type=rq_adjust,
             expect_df=True,
         )
         if rq_df is None or len(rq_df) == 0:

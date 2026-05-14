@@ -62,7 +62,7 @@ class FakeProvider(BaseProvider):
     def seed_instruments(self, asset_type: str, codes: list[str]):
         self._instruments[asset_type] = codes
 
-    def fetch_daily(self, codes, start_date, end_date):
+    def fetch_daily(self, codes, start_date, end_date, adjust="qfq"):
         self.fetch_daily_calls.append((codes, start_date, end_date))
         dfs = []
         for c in codes:

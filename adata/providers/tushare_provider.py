@@ -80,6 +80,21 @@ def _to_ts_date(date_str: str) -> str:
     return date_str.replace("-", "")
 
 
+def _transform_ts_df(df: pd.DataFrame, code_map: dict[str, str]) -> pd.DataFrame:
+    """Transform tushare daily output → standard schema."""
+    out = pd.DataFrame()
+    out["trade_date"] = pd.to_datetime(df["trade_date"])
+    out["stock_code"] = df["ts_code"].map(code_map)
+    out["open"] = pd.to_numeric(df["open"], errors="coerce")
+    out["high"] = pd.to_numeric(df["high"], errors="coerce")
+    out["low"] = pd.to_numeric(df["low"], errors="coerce")
+    out["close"] = pd.to_numeric(df["close"], errors="coerce")
+    out["volume"] = pd.to_numeric(df["vol"], errors="coerce") * 100.0
+    out["amount"] = pd.to_numeric(df["amount"], errors="coerce") * 1000.0
+    out["pct_change"] = pd.to_numeric(df["pct_chg"], errors="coerce")
+    return out[DAILY_COLUMNS].sort_values("trade_date")
+
+
 @register
 class TushareProvider(BaseProvider):
     name = "tushare"
@@ -90,38 +105,54 @@ class TushareProvider(BaseProvider):
         codes: list[str],
         start_date: str,
         end_date: str,
+        adjust: str = "qfq",
     ) -> pd.DataFrame:
+        if adjust != "none":
+            logger.warning("tushare daily() returns unadjusted prices; adjust='%s' ignored", adjust)
         pro = _get_pro()
+        ts_codes = {_to_ts_code(c): CodeNormalizer.normalize(c) for c in codes}
+        trade_dates = pd.bdate_range(start_date, end_date)
+
+        if len(codes) >= 50 and len(trade_dates) < len(codes):
+            return self._fetch_by_date(pro, ts_codes, start_date, end_date)
+        return self._fetch_by_stock(pro, ts_codes, start_date, end_date)
+
+    def _fetch_by_stock(self, pro, ts_codes: dict, start_date: str, end_date: str) -> pd.DataFrame:
         ts_start = _to_ts_date(start_date)
         ts_end = _to_ts_date(end_date)
         all_dfs: list[pd.DataFrame] = []
 
-        for i, raw_code in enumerate(codes):
-            ts_code = _to_ts_code(raw_code)
-            bs_code = CodeNormalizer.normalize(raw_code)
+        for i, (ts_code, bs_code) in enumerate(ts_codes.items()):
             try:
-                df = pro.daily(
-                    ts_code=ts_code,
-                    start_date=ts_start,
-                    end_date=ts_end,
-                )
+                df = pro.daily(ts_code=ts_code, start_date=ts_start, end_date=ts_end)
                 if df is not None and len(df) > 0:
-                    out = pd.DataFrame()
-                    out["trade_date"] = pd.to_datetime(df["trade_date"])
-                    out["stock_code"] = bs_code
-                    out["open"] = pd.to_numeric(df["open"], errors="coerce")
-                    out["high"] = pd.to_numeric(df["high"], errors="coerce")
-                    out["low"] = pd.to_numeric(df["low"], errors="coerce")
-                    out["close"] = pd.to_numeric(df["close"], errors="coerce")
-                    out["volume"] = pd.to_numeric(df["vol"], errors="coerce") * 100.0
-                    out["amount"] = pd.to_numeric(df["amount"], errors="coerce") * 1000.0
-                    out["pct_change"] = pd.to_numeric(df["pct_chg"], errors="coerce")
-                    all_dfs.append(out[DAILY_COLUMNS].sort_values("trade_date"))
+                    all_dfs.append(_transform_ts_df(df, {ts_code: bs_code}))
             except Exception as e:
-                logger.warning("tushare fetch failed for %s: %s", raw_code, e)
-
+                logger.warning("tushare fetch failed for %s: %s", bs_code, e)
             if (i + 1) % 50 == 0:
-                logger.info("tushare progress: %d/%d", i + 1, len(codes))
+                logger.info("tushare progress: %d/%d stocks", i + 1, len(ts_codes))
+
+        if not all_dfs:
+            return pd.DataFrame(columns=DAILY_COLUMNS)
+        return pd.concat(all_dfs, ignore_index=True)
+
+    def _fetch_by_date(self, pro, ts_codes: dict, start_date: str, end_date: str) -> pd.DataFrame:
+        trade_dates = pd.bdate_range(start_date, end_date)
+        all_dfs: list[pd.DataFrame] = []
+        wanted = set(ts_codes.keys())
+
+        for i, td in enumerate(trade_dates):
+            ts_date = td.strftime("%Y%m%d")
+            try:
+                df = pro.daily(trade_date=ts_date)
+                if df is not None and len(df) > 0:
+                    df = df[df["ts_code"].isin(wanted)]
+                    if len(df) > 0:
+                        all_dfs.append(_transform_ts_df(df, ts_codes))
+            except Exception as e:
+                logger.warning("tushare fetch failed for date %s: %s", ts_date, e)
+            if (i + 1) % 20 == 0:
+                logger.info("tushare date progress: %d/%d days", i + 1, len(trade_dates))
 
         if not all_dfs:
             return pd.DataFrame(columns=DAILY_COLUMNS)

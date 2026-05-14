@@ -68,28 +68,40 @@ class ParquetStore:
         ]
 
     def stats(self, category: str = "stocks") -> dict:
-        codes = self.list_cached(category)
-        if not codes:
+        import pyarrow.parquet as pq
+
+        d = self.data_dir / category
+        if not d.is_dir():
+            return {"files": 0, "codes": [], "date_range": None, "total_rows": 0}
+
+        files = sorted(d.glob("*.parquet"))
+        if not files:
             return {"files": 0, "codes": [], "date_range": None, "total_rows": 0}
 
         total_rows = 0
         date_min = None
         date_max = None
 
-        for code in codes:
-            df = self.read(code, category)
-            if df is None or len(df) == 0:
+        for f in files:
+            try:
+                pf = pq.ParquetFile(f)
+                total_rows += pf.metadata.num_rows
+                if "trade_date" in pf.schema_arrow.names:
+                    col = pf.read(columns=["trade_date"])["trade_date"]
+                    if len(col) > 0:
+                        lo = col.to_pandas().min()
+                        hi = col.to_pandas().max()
+                        lo = pd.Timestamp(lo)
+                        hi = pd.Timestamp(hi)
+                        if date_min is None or lo < date_min:
+                            date_min = lo
+                        if date_max is None or hi > date_max:
+                            date_max = hi
+            except Exception:
                 continue
-            total_rows += len(df)
-            lo = df["trade_date"].min()
-            hi = df["trade_date"].max()
-            if date_min is None or lo < date_min:
-                date_min = lo
-            if date_max is None or hi > date_max:
-                date_max = hi
 
         return {
-            "files": len(codes),
+            "files": len(files),
             "date_range": (
                 f"{date_min.date()} ~ {date_max.date()}" if date_min else None
             ),

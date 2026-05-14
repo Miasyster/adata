@@ -38,13 +38,16 @@ _CN_COLUMNS = {
 }
 
 
-def _fetch_one_stock(symbol: str, bs_code: str, start_date: str, end_date: str) -> pd.DataFrame | None:
+_ADJUST_MAP = {"qfq": "qfq", "hfq": "hfq", "none": ""}
+
+
+def _fetch_one_stock(symbol: str, bs_code: str, start_date: str, end_date: str, adjust: str = "qfq") -> pd.DataFrame | None:
     ak_start = start_date.replace("-", "")
     ak_end = end_date.replace("-", "")
 
     df = ak.stock_zh_a_hist(
         symbol=symbol, period="daily",
-        start_date=ak_start, end_date=ak_end, adjust="qfq",
+        start_date=ak_start, end_date=ak_end, adjust=adjust,
     )
     if df is None or len(df) == 0:
         return None
@@ -58,13 +61,13 @@ def _fetch_one_stock(symbol: str, bs_code: str, start_date: str, end_date: str) 
     return df[DAILY_COLUMNS].sort_values("trade_date")
 
 
-def _fetch_one_etf(symbol: str, bs_code: str, start_date: str, end_date: str) -> pd.DataFrame | None:
+def _fetch_one_etf(symbol: str, bs_code: str, start_date: str, end_date: str, adjust: str = "qfq") -> pd.DataFrame | None:
     ak_start = start_date.replace("-", "")
     ak_end = end_date.replace("-", "")
 
     df = ak.fund_etf_hist_em(
         symbol=symbol, period="daily",
-        start_date=ak_start, end_date=ak_end, adjust="qfq",
+        start_date=ak_start, end_date=ak_end, adjust=adjust,
     )
     if df is None or len(df) == 0:
         return None
@@ -90,9 +93,11 @@ class AkshareProvider(BaseProvider):
         codes: list[str],
         start_date: str,
         end_date: str,
+        adjust: str = "qfq",
     ) -> pd.DataFrame:
         _ensure_installed()
         all_dfs: list[pd.DataFrame] = []
+        ak_adjust = _ADJUST_MAP.get(adjust, "qfq")
 
         for i, raw_code in enumerate(codes):
             bs_code = CodeNormalizer.normalize(raw_code)
@@ -100,9 +105,9 @@ class AkshareProvider(BaseProvider):
 
             try:
                 if symbol.startswith(self._ETF_PREFIXES):
-                    df = _fetch_one_etf(symbol, bs_code, start_date, end_date)
+                    df = _fetch_one_etf(symbol, bs_code, start_date, end_date, ak_adjust)
                 else:
-                    df = _fetch_one_stock(symbol, bs_code, start_date, end_date)
+                    df = _fetch_one_stock(symbol, bs_code, start_date, end_date, ak_adjust)
 
                 if df is not None and len(df) > 0:
                     all_dfs.append(df)

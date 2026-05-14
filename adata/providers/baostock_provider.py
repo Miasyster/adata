@@ -76,7 +76,10 @@ def _query_to_df(rs) -> pd.DataFrame | None:
     return pd.DataFrame(rows, columns=rs.fields)
 
 
-def _fetch_one(code: str, start_date: str, end_date: str) -> pd.DataFrame | None:
+_ADJUST_MAP = {"qfq": "2", "hfq": "1", "none": "3"}
+
+
+def _fetch_one(code: str, start_date: str, end_date: str, adjustflag: str = "2") -> pd.DataFrame | None:
     """Fetch single stock daily OHLCV (must be called inside login session)."""
     rs = bs.query_history_k_data_plus(
         code,
@@ -84,7 +87,7 @@ def _fetch_one(code: str, start_date: str, end_date: str) -> pd.DataFrame | None
         start_date=start_date,
         end_date=end_date,
         frequency="d",
-        adjustflag="2",
+        adjustflag=adjustflag,
     )
     df = _query_to_df(rs)
     if df is None:
@@ -114,9 +117,11 @@ class BaostockProvider(BaseProvider):
         codes: list[str],
         start_date: str,
         end_date: str,
+        adjust: str = "qfq",
     ) -> pd.DataFrame:
         _ensure_installed()
         all_dfs: list[pd.DataFrame] = []
+        adjustflag = _ADJUST_MAP.get(adjust, "2")
 
         with _bs_lock:
             _login()
@@ -124,7 +129,7 @@ class BaostockProvider(BaseProvider):
                 for i, raw_code in enumerate(codes):
                     code = CodeNormalizer.to_baostock(raw_code)
                     try:
-                        df = _fetch_one(code, start_date, end_date)
+                        df = _fetch_one(code, start_date, end_date, adjustflag)
                         if df is not None and len(df) > 0:
                             all_dfs.append(df)
                     except Exception as e:
@@ -237,6 +242,14 @@ class BaostockProvider(BaseProvider):
         return sorted(codes)
 
     def _derive_exclusion(self, date: str, top_n: int) -> list[str]:
+        # baostock 不提供 CSI1000/CSI2000 成分接口，此处用「全 A - HS300 - CSI500」
+        # 近似，按代码排序截取 top_n。结果与真实成分（按市值排名）有偏差。
+        # 如需精确成分请使用 rqdatac 或 tushare provider。
+        logger.warning(
+            "baostock CSI%d uses exclusion approximation (not market-cap ranked). "
+            "Use rqdatac or tushare for accurate constituents.",
+            top_n,
+        )
         hs300 = set(self._fetch_index_bs("hs300", date))
         csi500 = set(self._fetch_index_bs("csi500", date))
         exclude = hs300 | csi500

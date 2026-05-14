@@ -17,6 +17,10 @@ from .schema import CodeNormalizer
 
 logger = logging.getLogger(__name__)
 
+
+def _error(code: str, message: str) -> str:
+    return json.dumps({"error": message, "error_code": code}, ensure_ascii=False)
+
 mcp = FastMCP(
     "adata",
     instructions=(
@@ -58,7 +62,7 @@ def query_daily(
     client = _get_client()
     code_list = [c.strip() for c in codes.split(",") if c.strip()]
     if not code_list:
-        return json.dumps({"error": "codes 不能为空"})
+        return _error("EMPTY_CODES", "codes 不能为空")
 
     df = client.query_daily(
         code_list,
@@ -164,7 +168,7 @@ def data_freshness(codes: str, category: str = "stocks") -> str:
     client = _get_client()
     code_list = [c.strip() for c in codes.split(",") if c.strip()]
     if not code_list:
-        return json.dumps({"error": "codes 不能为空"})
+        return _error("EMPTY_CODES", "codes 不能为空")
 
     results = client.data_freshness(code_list, category=category)
     return json.dumps(results, ensure_ascii=False)
@@ -194,11 +198,11 @@ def update_data(
     if universe:
         code_list = client.query_universe(universe)
         if not code_list:
-            return json.dumps({"error": f"无法获取股票池 '{universe}' 的成分"})
+            return _error("UNIVERSE_EMPTY", f"无法获取股票池 '{universe}' 的成分")
     elif codes:
         code_list = [c.strip() for c in codes.split(",") if c.strip()]
     else:
-        return json.dumps({"error": "请指定 universe 或 codes"})
+        return _error("MISSING_PARAM", "请指定 universe 或 codes")
 
     df = client.query_daily(
         code_list,

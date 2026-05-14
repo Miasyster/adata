@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "adata": {
+      "command": "python",
+      "args": ["-m", "adata", "mcp"]
+    }
+  }
+}
