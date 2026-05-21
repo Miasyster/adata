@@ -25,6 +25,7 @@ _CATEGORY_ASSET_TYPE = {
     "stocks": "stock",
     "etf": "etf",
     "index": "index",
+    "hk": "hk_stock",
 }
 
 
@@ -112,7 +113,7 @@ class DataClient:
         return []
 
     def data_status(self, category: str | None = None) -> dict:
-        categories = [category] if category else ["stocks", "etf", "index", "benchmark"]
+        categories = [category] if category else ["stocks", "etf", "index", "hk", "benchmark"]
         cat_stats = {}
         for cat in categories:
             cat_dir = self.store.data_dir / cat

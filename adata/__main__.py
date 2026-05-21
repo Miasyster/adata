@@ -30,12 +30,12 @@ def _build_parser() -> argparse.ArgumentParser:
     fetch.add_argument(
         "--category",
         default="stocks",
-        help="Asset category: stocks, etf, index (default: stocks)",
+        help="Asset category: stocks, etf, index, hk (default: stocks)",
     )
     fetch.add_argument(
         "--universe",
         default=None,
-        help="Universe name: hs300, csi500, csi1000, csi2000, all_a",
+        help="Universe name: hs300, csi500, csi1000, hsi, hstech, all",
     )
     fetch.add_argument(
         "--codes",
@@ -61,7 +61,7 @@ def _build_parser() -> argparse.ArgumentParser:
     fetch.add_argument(
         "--benchmark",
         default=None,
-        help="Comma-separated benchmark names: hs300,zz500,csi1000,sz50",
+        help="Comma-separated benchmark names: hs300,zz500,csi1000,sz50,hsi,hscei,hstech",
     )
     fetch.add_argument(
         "--batch-size",
@@ -101,7 +101,7 @@ def _cmd_fetch(args: argparse.Namespace):
         return
 
     if args.universe == "all":
-        asset_type = {"stocks": "stock", "etf": "etf", "index": "index"}.get(
+        asset_type = {"stocks": "stock", "etf": "etf", "index": "index", "hk": "hk_stock"}.get(
             args.category, "stock"
         )
         codes = provider.list_instruments(asset_type)
@@ -174,7 +174,7 @@ def _cmd_status(args: argparse.Namespace):
     data_dir = get_data_dir()
     print(f"Data directory: {data_dir}")
 
-    categories = [args.category] if args.category else ["stocks", "etf", "index", "benchmark"]
+    categories = [args.category] if args.category else ["stocks", "etf", "index", "hk", "benchmark"]
     for cat in categories:
         cat_dir = data_dir / cat
         if not cat_dir.is_dir():

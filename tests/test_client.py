@@ -197,6 +197,41 @@ class TestProviderFallback:
         assert len(df) == 1
 
 
+class TestHKQueryDaily:
+    @pytest.fixture
+    def hk_client(self, tmp_path):
+        provider = FakeProvider()
+        provider.seed_daily("hk.00700", [
+            "2025-01-02", "2025-01-03", "2025-01-06",
+        ])
+        provider.seed_universe("hsi", ["hk.00700", "hk.09988"])
+        client = DataClient(data_dir=str(tmp_path))
+        with patch.object(client, "_resolve_providers", return_value=[provider]):
+            yield client, provider
+
+    def test_fetches_hk_stock(self, hk_client):
+        client, _ = hk_client
+        df = client.query_daily(["hk.00700"], "2025-01-02", "2025-01-06", category="hk")
+        assert len(df) == 3
+        assert df["stock_code"].iloc[0] == "hk.00700"
+
+    def test_hk_code_normalization(self, hk_client):
+        client, _ = hk_client
+        df = client.query_daily(["00700.XHKG"], "2025-01-02", "2025-01-06", category="hk")
+        assert len(df) == 3
+
+    def test_hk_data_status(self, hk_client):
+        client, _ = hk_client
+        client.query_daily(["hk.00700"], "2025-01-02", "2025-01-06", category="hk")
+        status = client.data_status()
+        assert "hk" in status["categories"]
+
+    def test_hk_universe(self, hk_client):
+        client, _ = hk_client
+        codes = client.query_universe("hsi")
+        assert "hk.00700" in codes
+
+
 class TestValidation:
     def test_rejects_missing_required_columns(self, tmp_path):
         """Provider returning data without stock_code should be rejected."""

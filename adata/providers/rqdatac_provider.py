@@ -84,7 +84,7 @@ def _transform_batch(rq_df: pd.DataFrame) -> pd.DataFrame:
 @register
 class RqdatacProvider(BaseProvider):
     name = "rqdatac"
-    supported_asset_types = {"stock", "etf", "index"}
+    supported_asset_types = {"stock", "etf", "index", "hk_stock"}
 
     _ADJUST_MAP = {"qfq": "pre", "hfq": "post", "none": "none"}
 
@@ -153,7 +153,7 @@ class RqdatacProvider(BaseProvider):
         date: str | None = None,
     ) -> list[str]:
         _ensure_init()
-        type_map = {"stock": "CS", "etf": "ETF", "index": "INDX"}
+        type_map = {"stock": "CS", "etf": "ETF", "index": "INDX", "hk_stock": "CS"}
         rq_type = type_map.get(asset_type)
         if not rq_type:
             raise ValueError(
@@ -164,6 +164,8 @@ class RqdatacProvider(BaseProvider):
         kwargs = {"type": rq_type}
         if date:
             kwargs["date"] = date
+        if asset_type == "hk_stock":
+            kwargs["market"] = "hk"
         instruments = rqdatac.all_instruments(**kwargs)
         if instruments is None or len(instruments) == 0:
             return []
@@ -171,7 +173,10 @@ class RqdatacProvider(BaseProvider):
         codes = []
         for oid in instruments["order_book_id"]:
             try:
-                codes.append(CodeNormalizer.from_rqdatac(oid))
+                code = CodeNormalizer.from_rqdatac(oid)
+                if asset_type == "hk_stock" and not code.startswith("hk."):
+                    continue
+                codes.append(code)
             except Exception:
                 continue
         return sorted(codes)

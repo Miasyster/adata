@@ -40,10 +40,12 @@ def mcp_client(tmp_path):
         "2025-01-02", "2025-01-03", "2025-01-06", "2025-01-07", "2025-01-08",
     ])
     provider.seed_daily("sz.000001", ["2025-01-02", "2025-01-03"])
+    provider.seed_daily("hk.00700", ["2025-01-02", "2025-01-03", "2025-01-06"])
     provider.seed_benchmark("hs300", [
         "2025-01-02", "2025-01-03", "2025-01-06", "2025-01-07",
     ])
     provider.seed_universe("hs300", ["sh.600519", "sz.000001"])
+    provider.seed_universe("hsi", ["hk.00700", "hk.09988"])
 
     client = DataClient(data_dir=str(tmp_path))
     mod._client = client
@@ -144,6 +146,18 @@ class TestUpdateDataTool:
     def test_no_target_error(self, mcp_client):
         result = json.loads(update_data())
         assert "error" in result
+
+
+class TestHKQueryDailyTool:
+    def test_hk_query(self, mcp_client):
+        result = json.loads(query_daily("hk.00700", "2025-01-02", "2025-01-06", category="hk"))
+        assert result["rows"] == 3
+        assert "hk.00700" in result["codes"]
+
+    def test_hk_universe(self, mcp_client):
+        result = json.loads(query_universe("hsi"))
+        assert result["count"] == 2
+        assert "hk.00700" in result["codes"]
 
 
 class TestMCPToolRegistration:

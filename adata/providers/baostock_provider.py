@@ -110,7 +110,7 @@ def _fetch_one(code: str, start_date: str, end_date: str, adjustflag: str = "2")
 @register
 class BaostockProvider(BaseProvider):
     name = "baostock"
-    supported_asset_types = {"stock"}
+    supported_asset_types = {"stock", "etf"}
 
     def fetch_daily(
         self,
@@ -185,8 +185,8 @@ class BaostockProvider(BaseProvider):
         date: str | None = None,
     ) -> list[str]:
         _ensure_installed()
-        if asset_type != "stock":
-            raise ValueError(f"baostock only supports asset_type='stock', got '{asset_type}'")
+        if asset_type not in ("stock", "etf"):
+            raise ValueError(f"baostock only supports asset_type='stock'/'etf', got '{asset_type}'")
 
         from datetime import datetime
         date = date or datetime.now().strftime("%Y-%m-%d")

@@ -24,8 +24,8 @@ def _error(code: str, message: str) -> str:
 mcp = FastMCP(
     "adata",
     instructions=(
-        "adata — A 股金融数据基建。查询日线行情、基准指数、股票池成分。"
-        "数据自动缓存，智能路由多数据源（PolarDB → rqdatac → baostock → akshare）。"
+        "adata — A 股/港股金融数据基建。查询日线行情、基准指数、股票池成分。"
+        "数据自动缓存，智能路由多数据源（PolarDB → rqdatac → tushare → baostock → akshare）。"
     ),
 )
 
@@ -49,15 +49,15 @@ def query_daily(
     end_date: str = "",
     category: str = "stocks",
 ) -> str:
-    """查询 A 股日线数据（OHLCV + 涨跌幅）。
+    """查询 A 股/港股日线数据（OHLCV + 涨跌幅）。
 
     自动从缓存或数据源获取，无需指定数据源。
 
     Args:
-        codes: 股票代码，逗号分隔，如 'sh.600519,sz.000001'
+        codes: 股票代码，逗号分隔，如 'sh.600519,sz.000001' (A股) 或 'hk.00700' (港股)
         start_date: 起始日期 YYYY-MM-DD
         end_date: 结束日期 YYYY-MM-DD（默认今天）
-        category: 品种类型 stocks/etf/index
+        category: 品种类型 stocks/etf/index/hk
     """
     client = _get_client()
     code_list = [c.strip() for c in codes.split(",") if c.strip()]
@@ -99,7 +99,7 @@ def query_benchmark(
     """查询基准指数日线（收盘价 + 日收益率）。
 
     Args:
-        name: 基准名称 hs300/zz500/csi500/csi1000/sz50
+        name: 基准名称 hs300/zz500/csi500/csi1000/sz50/hsi/hscei/hstech
         start_date: 起始日期 YYYY-MM-DD
         end_date: 结束日期 YYYY-MM-DD（默认今天）
     """
@@ -132,7 +132,7 @@ def query_universe(
     """查询股票池成分列表。
 
     Args:
-        universe: 股票池名称 hs300/csi500/csi1000/csi2000
+        universe: 股票池名称 hs300/csi500/csi1000/hsi/hstech
         date: 日期 YYYY-MM-DD（默认今天）
     """
     client = _get_client()
@@ -150,7 +150,7 @@ def data_status(category: str = "") -> str:
     """查看当前数据缓存状态：覆盖范围、数据量、可用数据源。
 
     Args:
-        category: 品种类型过滤 stocks/etf/index/benchmark（默认全部）
+        category: 品种类型过滤 stocks/etf/index/hk/benchmark（默认全部）
     """
     client = _get_client()
     status = client.data_status(category=category or None)
@@ -163,7 +163,7 @@ def data_freshness(codes: str, category: str = "stocks") -> str:
 
     Args:
         codes: 股票代码，逗号分隔
-        category: 品种类型 stocks/etf/index
+        category: 品种类型 stocks/etf/index/hk
     """
     client = _get_client()
     code_list = [c.strip() for c in codes.split(",") if c.strip()]
@@ -189,7 +189,7 @@ def update_data(
     Args:
         universe: 股票池名称（如 hs300），与 codes 二选一
         codes: 逗号分隔的股票代码，与 universe 二选一
-        category: 品种类型 stocks/etf/index
+        category: 品种类型 stocks/etf/index/hk
         start_date: 起始日期 YYYY-MM-DD
         end_date: 结束日期 YYYY-MM-DD（默认今天）
     """

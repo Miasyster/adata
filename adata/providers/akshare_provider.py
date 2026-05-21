@@ -81,10 +81,28 @@ def _fetch_one_etf(symbol: str, bs_code: str, start_date: str, end_date: str, ad
     return df[DAILY_COLUMNS].sort_values("trade_date")
 
 
+def _fetch_one_hk_stock(symbol: str, bs_code: str, start_date: str, end_date: str, adjust: str = "qfq") -> pd.DataFrame | None:
+    ak_start = start_date.replace("-", "")
+    ak_end = end_date.replace("-", "")
+
+    df = ak.stock_hk_hist(symbol=symbol, period="daily",
+                          start_date=ak_start, end_date=ak_end, adjust=adjust)
+    if df is None or len(df) == 0:
+        return None
+
+    df = df.rename(columns=_CN_COLUMNS)
+    df["stock_code"] = bs_code
+    df["trade_date"] = pd.to_datetime(df["trade_date"])
+    for col in ("open", "high", "low", "close", "volume", "amount", "pct_change"):
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+    return df[DAILY_COLUMNS].sort_values("trade_date")
+
+
 @register
 class AkshareProvider(BaseProvider):
     name = "akshare"
-    supported_asset_types = {"stock", "etf"}
+    supported_asset_types = {"stock", "etf", "hk_stock"}
 
     _ETF_PREFIXES = ("51", "52", "56", "58", "59", "15", "16")
 
@@ -104,7 +122,9 @@ class AkshareProvider(BaseProvider):
             symbol = bs_code.split(".")[1] if "." in bs_code else raw_code
 
             try:
-                if symbol.startswith(self._ETF_PREFIXES):
+                if bs_code.startswith("hk."):
+                    df = _fetch_one_hk_stock(symbol, bs_code, start_date, end_date, ak_adjust)
+                elif symbol.startswith(self._ETF_PREFIXES):
                     df = _fetch_one_etf(symbol, bs_code, start_date, end_date, ak_adjust)
                 else:
                     df = _fetch_one_stock(symbol, bs_code, start_date, end_date, ak_adjust)
@@ -192,6 +212,15 @@ class AkshareProvider(BaseProvider):
                     codes.append(f"sh.{raw}")
                 elif raw.startswith(("1", "0")):
                     codes.append(f"sz.{raw}")
+            return sorted(codes)
+
+        if asset_type == "hk_stock":
+            df = ak.stock_hk_spot_em()
+            if df is None or len(df) == 0:
+                return []
+            codes = []
+            for raw in df["代码"]:
+                codes.append(f"hk.{str(raw).zfill(5)}")
             return sorted(codes)
 
         raise ValueError(f"akshare list_instruments: unsupported asset_type '{asset_type}'")

@@ -18,12 +18,12 @@ DAILY_COLUMNS = [
 
 BENCHMARK_COLUMNS = ["trade_date", "close", "daily_return"]
 
-_RQ_SUFFIX = {"sh": "XSHG", "sz": "XSHE"}
+_RQ_SUFFIX = {"sh": "XSHG", "sz": "XSHE", "hk": "XHKG"}
 _RQ_SUFFIX_REV = {v: k for k, v in _RQ_SUFFIX.items()}
 
 _NORMALIZE_RE = re.compile(
-    r"^(?:(?P<pfx>[A-Za-z]{2})[\._]?(?P<num>\d{6}))"
-    r"|(?:(?P<num2>\d{6})[\._](?P<sfx>[A-Za-z]{2,4}))$"
+    r"^(?:(?P<pfx>[A-Za-z]{2})[\._]?(?P<num>\d{5,6}))"
+    r"|(?:(?P<num2>\d{5,6})[\._](?P<sfx>[A-Za-z]{2,4}))$"
 )
 
 
@@ -40,7 +40,7 @@ class CodeNormalizer:
         if m.group("pfx") and m.group("num"):
             pfx = m.group("pfx").lower()
             num = m.group("num")
-            if pfx in ("sh", "sz"):
+            if pfx in ("sh", "sz", "hk"):
                 return f"{pfx}.{num}"
             if pfx in _RQ_SUFFIX_REV:
                 return f"{_RQ_SUFFIX_REV[pfx]}.{num}"
@@ -48,7 +48,7 @@ class CodeNormalizer:
 
         num = m.group("num2")
         sfx = m.group("sfx").upper()
-        if sfx in ("SH", "SZ"):
+        if sfx in ("SH", "SZ", "HK"):
             return f"{sfx.lower()}.{num}"
         if sfx in _RQ_SUFFIX_REV:
             return f"{_RQ_SUFFIX_REV[sfx]}.{num}"
@@ -74,7 +74,7 @@ class CodeNormalizer:
     def from_parquet_name(name: str) -> str:
         name = name.removesuffix(".parquet")
         parts = name.split("_", 1)
-        if len(parts) == 2 and parts[0] in ("sh", "sz"):
+        if len(parts) == 2 and parts[0] in ("sh", "sz", "hk"):
             return f"{parts[0]}.{parts[1]}"
         return name
 

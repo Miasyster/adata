@@ -30,6 +30,9 @@ _BENCHMARK_CODES = {
     "csi1000": "000852.SH",
     "sz50": "000016.SH",
     "csi2000": "932000.CSI",
+    "hsi": "HSI",
+    "hscei": "HSCEI",
+    "hstech": "HSTECH",
 }
 
 _UNIVERSE_CODES = {
@@ -59,18 +62,18 @@ def _get_pro():
 
 
 def _to_ts_code(code: str) -> str:
-    """sh.600519 → 600519.SH"""
+    """sh.600519 → 600519.SH, hk.00700 → 00700.HK"""
     code = CodeNormalizer.normalize(code)
     parts = code.split(".", 1)
-    if len(parts) == 2 and parts[0] in ("sh", "sz"):
+    if len(parts) == 2 and parts[0] in ("sh", "sz", "hk"):
         return f"{parts[1]}.{parts[0].upper()}"
     return code
 
 
 def _from_ts_code(ts_code: str) -> str:
-    """600519.SH → sh.600519"""
+    """600519.SH → sh.600519, 00700.HK → hk.00700"""
     parts = ts_code.split(".", 1)
-    if len(parts) == 2 and parts[1] in ("SH", "SZ"):
+    if len(parts) == 2 and parts[1] in ("SH", "SZ", "HK"):
         return f"{parts[1].lower()}.{parts[0]}"
     return ts_code
 
@@ -98,7 +101,7 @@ def _transform_ts_df(df: pd.DataFrame, code_map: dict[str, str]) -> pd.DataFrame
 @register
 class TushareProvider(BaseProvider):
     name = "tushare"
-    supported_asset_types = {"stock", "index"}
+    supported_asset_types = {"stock", "index", "hk_stock"}
 
     def fetch_daily(
         self,
@@ -111,11 +114,29 @@ class TushareProvider(BaseProvider):
             logger.warning("tushare daily() returns unadjusted prices; adjust='%s' ignored", adjust)
         pro = _get_pro()
         ts_codes = {_to_ts_code(c): CodeNormalizer.normalize(c) for c in codes}
-        trade_dates = pd.bdate_range(start_date, end_date)
 
-        if len(codes) >= 50 and len(trade_dates) < len(codes):
-            return self._fetch_by_date(pro, ts_codes, start_date, end_date)
-        return self._fetch_by_stock(pro, ts_codes, start_date, end_date)
+        hk_codes = {k: v for k, v in ts_codes.items() if v.startswith("hk.")}
+        a_codes = {k: v for k, v in ts_codes.items() if not v.startswith("hk.")}
+
+        all_dfs: list[pd.DataFrame] = []
+
+        if a_codes:
+            trade_dates = pd.bdate_range(start_date, end_date)
+            if len(a_codes) >= 50 and len(trade_dates) < len(a_codes):
+                df = self._fetch_by_date(pro, a_codes, start_date, end_date)
+            else:
+                df = self._fetch_by_stock(pro, a_codes, start_date, end_date)
+            if len(df) > 0:
+                all_dfs.append(df)
+
+        if hk_codes:
+            df = self._fetch_hk(pro, hk_codes, start_date, end_date)
+            if len(df) > 0:
+                all_dfs.append(df)
+
+        if not all_dfs:
+            return pd.DataFrame(columns=DAILY_COLUMNS)
+        return pd.concat(all_dfs, ignore_index=True)
 
     def _fetch_by_stock(self, pro, ts_codes: dict, start_date: str, end_date: str) -> pd.DataFrame:
         ts_start = _to_ts_date(start_date)
@@ -158,6 +179,25 @@ class TushareProvider(BaseProvider):
             return pd.DataFrame(columns=DAILY_COLUMNS)
         return pd.concat(all_dfs, ignore_index=True)
 
+    def _fetch_hk(self, pro, ts_codes: dict, start_date: str, end_date: str) -> pd.DataFrame:
+        ts_start = _to_ts_date(start_date)
+        ts_end = _to_ts_date(end_date)
+        all_dfs: list[pd.DataFrame] = []
+
+        for i, (ts_code, bs_code) in enumerate(ts_codes.items()):
+            try:
+                df = pro.hk_daily(ts_code=ts_code, start_date=ts_start, end_date=ts_end)
+                if df is not None and len(df) > 0:
+                    all_dfs.append(_transform_ts_df(df, {ts_code: bs_code}))
+            except Exception as e:
+                logger.warning("tushare HK fetch failed for %s: %s", bs_code, e)
+            if (i + 1) % 50 == 0:
+                logger.info("tushare HK progress: %d/%d stocks", i + 1, len(ts_codes))
+
+        if not all_dfs:
+            return pd.DataFrame(columns=DAILY_COLUMNS)
+        return pd.concat(all_dfs, ignore_index=True)
+
     def fetch_benchmark(
         self,
         name: str,
@@ -193,8 +233,14 @@ class TushareProvider(BaseProvider):
         date: str | None = None,
     ) -> list[str]:
         pro = _get_pro()
+        if asset_type == "hk_stock":
+            df = pro.hk_basic(list_status="L", fields="ts_code")
+            if df is None or len(df) == 0:
+                return []
+            return sorted(_from_ts_code(c) for c in df["ts_code"])
+
         if asset_type != "stock":
-            raise ValueError(f"tushare list_instruments only supports 'stock', got '{asset_type}'")
+            raise ValueError(f"tushare list_instruments only supports 'stock'/'hk_stock', got '{asset_type}'")
 
         df = pro.stock_basic(
             exchange="",

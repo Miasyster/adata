@@ -40,7 +40,7 @@ def make_benchmark_df(dates: list[str]) -> pd.DataFrame:
 class FakeProvider(BaseProvider):
     """In-memory provider for testing — no network calls."""
     name = "fake"
-    supported_asset_types = {"stock", "etf"}
+    supported_asset_types = {"stock", "etf", "hk_stock"}
 
     def __init__(self):
         self._daily_data: dict[str, pd.DataFrame] = {}

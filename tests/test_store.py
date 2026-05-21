@@ -104,6 +104,28 @@ class TestListCached:
         assert tmp_store.list_cached("nonexistent") == []
 
 
+class TestHKStorage:
+    def test_hk_write_and_read(self, tmp_store):
+        df = make_daily_df("hk.00700", ["2025-01-02", "2025-01-03"])
+        tmp_store.write("hk.00700", df, category="hk")
+        result = tmp_store.read("hk.00700", "hk")
+        assert result is not None
+        assert len(result) == 2
+
+    def test_hk_list_cached(self, tmp_store):
+        tmp_store.write("hk.00700", make_daily_df("hk.00700", ["2025-01-02"]), category="hk")
+        cached = tmp_store.list_cached("hk")
+        assert "hk.00700" in cached
+
+    def test_hk_merge_incremental(self, tmp_store):
+        df1 = make_daily_df("hk.00700", ["2025-01-02"])
+        tmp_store.write("hk.00700", df1, category="hk")
+        df2 = make_daily_df("hk.00700", ["2025-01-03"])
+        tmp_store.merge_incremental("hk.00700", df2, category="hk")
+        result = tmp_store.read("hk.00700", "hk")
+        assert len(result) == 2
+
+
 class TestStats:
     def test_stats_with_data(self, tmp_store):
         tmp_store.write("sh.600519", make_daily_df("sh.600519", ["2025-01-02", "2025-01-03"]))

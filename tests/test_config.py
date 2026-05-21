@@ -31,8 +31,20 @@ class TestBenchmarkMap:
             assert "rqdatac" in BENCHMARK_MAP[name]
 
 
+class TestHKBenchmarkMap:
+    def test_has_hk_benchmarks(self):
+        for name in ("hsi", "hscei", "hstech"):
+            assert name in BENCHMARK_MAP
+            assert "rqdatac" in BENCHMARK_MAP[name]
+
+
 class TestUniverseIndexMap:
     def test_has_required_universes(self):
         for name in ("hs300", "csi500", "csi1000"):
+            assert name in UNIVERSE_INDEX_MAP
+            assert UNIVERSE_INDEX_MAP[name] is not None
+
+    def test_has_hk_universes(self):
+        for name in ("hsi", "hstech"):
             assert name in UNIVERSE_INDEX_MAP
             assert UNIVERSE_INDEX_MAP[name] is not None
