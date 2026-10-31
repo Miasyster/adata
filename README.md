@@ -37,6 +37,8 @@ DataClient — smart routing layer
 
 ## Installation
 
+> The distribution name is `quantgpt-adata`; the import name stays `adata`. The `adata` package on PyPI is an unrelated project, so do not use `pip install adata`. Because both use the import name `adata`, do not install them in the same environment.
+
 ```bash
 pip install -e .
 

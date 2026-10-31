@@ -3,12 +3,12 @@ requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "adata"
+name = "quantgpt-adata"
 version = "0.1.0"
 description = "Agent-Native financial data infrastructure"
 requires-python = ">=3.10"
 dependencies = [
-    "pandas>=2.0",
+    "pandas>=2.0,<3",
     "pyarrow>=14.0",
     "python-dotenv>=1.0",
 ]
@@ -19,8 +19,8 @@ baostock = ["baostock"]
 akshare = ["akshare"]
 tushare = ["tushare"]
 polardb = ["pymysql"]
-mcp = ["mcp[cli]"]
-all = ["rqdatac", "baostock", "akshare", "tushare", "pymysql", "mcp[cli]"]
+mcp = ["mcp[cli]>=1.20,<2"]
+all = ["rqdatac", "baostock", "akshare", "tushare", "pymysql", "mcp[cli]>=1.20,<2"]
 
 [project.scripts]
 adata = "adata.__main__:main"

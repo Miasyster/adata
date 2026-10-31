@@ -7,3 +7,4 @@ build/
 data/
 .adata/
 .pytest_cache/
+.venv/
