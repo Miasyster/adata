@@ -1,6 +1,6 @@
 """adata - Agent-Native financial data infrastructure."""
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 from .client import DataClient
 from .config import get_data_dir

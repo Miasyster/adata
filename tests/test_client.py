@@ -86,6 +86,29 @@ class TestQueryDaily:
         client.query_daily(["sh.600519"], "2024-12-01", "2025-01-08")
         assert len(provider.fetch_daily_calls) == 2
 
+    def test_cache_hits_when_boundaries_are_non_trading_days(self, client_with_fake):
+        client, provider = client_with_fake
+        client.query_daily(["sh.600519"], "2025-01-01", "2025-01-12")
+        df = client.query_daily(["sh.600519"], "2025-01-01", "2025-01-12")
+        assert len(df) == 5
+        assert len(provider.fetch_daily_calls) == 1
+
+    def test_fetches_every_batch_from_same_provider(self, tmp_path):
+        provider = FakeProvider()
+        codes = [f"sh.{600000 + i}" for i in range(450)]
+        for code in codes:
+            provider.seed_daily(code, ["2025-01-02"])
+        fallback = FakeProvider()
+        fallback.name = "fallback"
+
+        client = DataClient(data_dir=str(tmp_path))
+        with patch.object(client, "_resolve_providers", return_value=[provider, fallback]):
+            df = client.query_daily(codes, "2025-01-02", "2025-01-02")
+
+        assert df["stock_code"].nunique() == 450
+        assert [len(call[0]) for call in provider.fetch_daily_calls] == [200, 200, 50]
+        assert fallback.fetch_daily_calls == []
+
 
 class TestQueryBenchmark:
     def test_fetches_benchmark(self, client_with_fake):
@@ -100,6 +123,12 @@ class TestQueryBenchmark:
         client, provider = client_with_fake
         client.query_benchmark("hs300", "2025-01-02", "2025-01-08")
         client.query_benchmark("hs300", "2025-01-02", "2025-01-08")
+        assert len(provider.fetch_benchmark_calls) == 1
+
+    def test_benchmark_cache_hits_when_boundaries_are_non_trading_days(self, client_with_fake):
+        client, provider = client_with_fake
+        client.query_benchmark("hs300", "2025-01-01", "2025-01-12")
+        client.query_benchmark("hs300", "2025-01-01", "2025-01-12")
         assert len(provider.fetch_benchmark_calls) == 1
 
     def test_unknown_benchmark_returns_empty(self, client_with_fake):

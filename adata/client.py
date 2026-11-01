@@ -21,6 +21,9 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_PRIORITY = ["polardb", "rqdatac", "tushare", "baostock", "akshare"]
 
+# Requested boundaries can fall on weekends or holidays, so cached data never reaches them exactly.
+_CACHE_BOUNDARY_TOLERANCE = pd.Timedelta(days=5)
+
 _CATEGORY_ASSET_TYPE = {
     "stocks": "stock",
     "etf": "etf",
@@ -76,7 +79,7 @@ class DataClient:
             hi = cached["trade_date"].max()
             req_start = pd.Timestamp(start_date)
             req_end = pd.Timestamp(end_date)
-            if lo <= req_start and hi >= req_end:
+            if lo <= req_start + _CACHE_BOUNDARY_TOLERANCE and hi >= req_end - _CACHE_BOUNDARY_TOLERANCE:
                 mask = (cached["trade_date"] >= req_start) & (cached["trade_date"] <= req_end)
                 return cached[mask].reset_index(drop=True)
 
@@ -176,7 +179,7 @@ class DataClient:
             if df is not None and len(df) > 0:
                 lo = df["trade_date"].min()
                 hi = df["trade_date"].max()
-                if lo <= req_start and hi >= req_end:
+                if lo <= req_start + _CACHE_BOUNDARY_TOLERANCE and hi >= req_end - _CACHE_BOUNDARY_TOLERANCE:
                     mask = (df["trade_date"] >= req_start) & (df["trade_date"] <= req_end)
                     filtered = df[mask]
                     if len(filtered) > 0 and len(filtered) >= expected * 0.3:
@@ -205,8 +208,10 @@ class DataClient:
             try:
                 logger.info("Fetching %d codes via %s", len(remaining), provider.name)
                 batch_size = 500 if provider.name == "polardb" else 200
-                for i in range(0, len(remaining), batch_size):
-                    chunk = remaining[i : i + batch_size]
+                # Slice a snapshot: `remaining` shrinks as chunks succeed.
+                pending = list(remaining)
+                for i in range(0, len(pending), batch_size):
+                    chunk = pending[i : i + batch_size]
                     df = provider.fetch_daily(chunk, start_date, end_date, adjust=adjust)
                     if df is not None and len(df) > 0:
                         df = self._validate_daily(df, provider.name)
